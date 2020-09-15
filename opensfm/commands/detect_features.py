@@ -80,8 +80,8 @@ def detect(args):
 
     config = deepcopy(data.config)
     if is_high_res_panorama(data, image):
-        config['feature_process_size'] = 4098
-        config['feature_min_frames'] = 16000
+        config['feature_process_size'] = config['feature_process_size_panorama']
+        config['feature_min_frames'] = config['feature_min_frames_panorama']
 
     start = timer()
     p_unmasked, f_unmasked, c_unmasked = features.extract_features(
