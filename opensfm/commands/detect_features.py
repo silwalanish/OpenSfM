@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 from timeit import default_timer as timer
 
 import numpy as np
@@ -8,6 +9,7 @@ from opensfm import dataset
 from opensfm import features
 from opensfm import io
 from opensfm import log
+from opensfm import pygeometry
 from opensfm.context import parallel_map
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,14 @@ class Command:
         data.save_report(io.json_dumps(report), 'features.json')
 
 
+def is_high_res_panorama(data, image):
+    """Detect if image is a panorama."""
+    exif = data.load_exif(image)
+    camera = data.load_camera_models()[exif['camera']]
+    return int(exif['width']) == 2 * int(exif['height']) or \
+        pygeometry.Camera.is_panorama(camera.projection_type)
+
+
 def detect(args):
     image, data = args
 
@@ -68,10 +78,14 @@ def detect(args):
     logger.info('Extracting {} features for image {}'.format(
         data.feature_type().upper(), image))
 
-    start = timer()
+    config = deepcopy(data.config)
+    if is_high_res_panorama(data, image):
+        config['feature_process_size'] = 4098
+        config['feature_min_frames'] = 16000
 
+    start = timer()
     p_unmasked, f_unmasked, c_unmasked = features.extract_features(
-        data.load_image(image), data.config)
+        data.load_image(image), config)
 
     fmask = data.load_features_mask(image, p_unmasked)
 
