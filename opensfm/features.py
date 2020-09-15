@@ -12,9 +12,8 @@ from opensfm import pyfeatures
 logger = logging.getLogger(__name__)
 
 
-def resized_image(image, config):
+def resized_image(image, max_size):
     """Resize image to feature_process_size."""
-    max_size = config['feature_process_size']
     h, w, _ = image.shape
     size = max(w, h)
     if 0 < max_size < size:
@@ -84,7 +83,7 @@ def _in_mask(point, width, height, mask):
     return mask[int(v), int(u)] != 0
 
 
-def extract_features_sift(image, config):
+def extract_features_sift(image, config, features_count):
     sift_edge_threshold = config['sift_edge_threshold']
     sift_peak_threshold = float(config['sift_peak_threshold'])
     if context.OPENCV3:
@@ -112,7 +111,7 @@ def extract_features_sift(image, config):
             detector.setDouble("contrastThreshold", sift_peak_threshold)
         points = detector.detect(image)
         logger.debug('Found {0} points in {1}s'.format(len(points), time.time() - t))
-        if len(points) < config['feature_min_frames'] and sift_peak_threshold > 0.0001:
+        if len(points) < features_count and sift_peak_threshold > 0.0001:
             sift_peak_threshold = (sift_peak_threshold * 2) / 3
             logger.debug('reducing threshold')
         else:
@@ -125,7 +124,7 @@ def extract_features_sift(image, config):
     return points, desc
 
 
-def extract_features_surf(image, config):
+def extract_features_surf(image, config, features_count):
     surf_hessian_threshold = config['surf_hessian_threshold']
     if context.OPENCV3:
         try:
@@ -156,7 +155,7 @@ def extract_features_surf(image, config):
             detector.setDouble("hessianThreshold", surf_hessian_threshold)  # default: 0.04
         points = detector.detect(image)
         logger.debug('Found {0} points in {1}s'.format(len(points), time.time() - t))
-        if len(points) < config['feature_min_frames'] and surf_hessian_threshold > 0.0001:
+        if len(points) < features_count and surf_hessian_threshold > 0.0001:
             surf_hessian_threshold = (surf_hessian_threshold * 2) / 3
             logger.debug('reducing threshold')
         else:
@@ -179,7 +178,7 @@ def akaze_descriptor_type(name):
         return d['MSURF']
 
 
-def extract_features_akaze(image, config):
+def extract_features_akaze(image, config, features_count):
     options = pyfeatures.AKAZEOptions()
     options.omax = config['akaze_omax']
     akaze_descriptor_name = config['akaze_descriptor']
@@ -189,7 +188,7 @@ def extract_features_akaze(image, config):
     options.dthreshold = config['akaze_dthreshold']
     options.kcontrast_percentile = config['akaze_kcontrast_percentile']
     options.use_isotropic_diffusion = config['akaze_use_isotropic_diffusion']
-    options.target_num_features = config['feature_min_frames']
+    options.target_num_features = features_count
     options.use_adaptive_suppression = config['feature_use_adaptive_suppression']
 
     logger.debug('Computing AKAZE with threshold {0}'.format(options.dthreshold))
@@ -206,12 +205,12 @@ def extract_features_akaze(image, config):
     return points, desc
 
 
-def extract_features_hahog(image, config):
+def extract_features_hahog(image, config, features_count):
     t = time.time()
     points, desc = pyfeatures.hahog(image.astype(np.float32) / 255,  # VlFeat expects pixel values between 0, 1
                               peak_threshold=config['hahog_peak_threshold'],
                               edge_threshold=config['hahog_edge_threshold'],
-                              target_num_features=config['feature_min_frames'],
+                              target_num_features=features_count,
                               use_adaptive_suppression=config['feature_use_adaptive_suppression'])
 
     if config['feature_root']:
@@ -227,14 +226,14 @@ def extract_features_hahog(image, config):
     return points, desc
 
 
-def extract_features_orb(image, config):
+def extract_features_orb(image, config, features_count):
     if context.OPENCV3:
-        detector = cv2.ORB_create(nfeatures=int(config['feature_min_frames']))
+        detector = cv2.ORB_create(nfeatures=features_count)
         descriptor = detector
     else:
         detector = cv2.FeatureDetector_create('ORB')
         descriptor = cv2.DescriptorExtractor_create('ORB')
-        detector.setDouble('nFeatures', config['feature_min_frames'])
+        detector.setDouble('nFeatures', features_count)
 
     logger.debug('Computing ORB')
     t = time.time()
@@ -247,7 +246,7 @@ def extract_features_orb(image, config):
     return points, desc
 
 
-def extract_features(color_image, config):
+def extract_features(color_image, config, is_panorama):
     """Detect features in an image.
 
     The type of feature detected is determined by the ``feature_type``
@@ -256,27 +255,33 @@ def extract_features(color_image, config):
     The coordinates of the detected points are returned in normalized
     image coordinates.
 
+    Optionnaly, one can indicate if the image is a panorama one. If True,
+    alternate settings are used for feature count and extraction size.
+
     Returns:
         tuple:
         - points: ``x``, ``y``, ``size`` and ``angle`` for each feature
         - descriptors: the descriptor of each feature
         - colors: the color of the center of each feature
     """
+    extraction_size = config['feature_process_size_panorama'] if is_panorama else config['feature_process_size']
+    features_count = config['feature_min_frames_panorama'] if is_panorama else config['feature_min_frames']
+
     assert len(color_image.shape) == 3
-    color_image = resized_image(color_image, config)
+    color_image = resized_image(color_image, extraction_size)
     image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
 
     feature_type = config['feature_type'].upper()
     if feature_type == 'SIFT':
-        points, desc = extract_features_sift(image, config)
+        points, desc = extract_features_sift(image, config, features_count)
     elif feature_type == 'SURF':
-        points, desc = extract_features_surf(image, config)
+        points, desc = extract_features_surf(image, config, features_count)
     elif feature_type == 'AKAZE':
-        points, desc = extract_features_akaze(image, config)
+        points, desc = extract_features_akaze(image, config, features_count)
     elif feature_type == 'HAHOG':
-        points, desc = extract_features_hahog(image, config)
+        points, desc = extract_features_hahog(image, config, features_count)
     elif feature_type == 'ORB':
-        points, desc = extract_features_orb(image, config)
+        points, desc = extract_features_orb(image, config, features_count)
     else:
         raise ValueError('Unknown feature type '
                          '(must be SURF, SIFT, AKAZE, HAHOG or ORB)')

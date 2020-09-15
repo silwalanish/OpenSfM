@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 from timeit import default_timer as timer
 
 import numpy as np
@@ -78,14 +77,10 @@ def detect(args):
     logger.info('Extracting {} features for image {}'.format(
         data.feature_type().upper(), image))
 
-    config = deepcopy(data.config)
-    if is_high_res_panorama(data, image):
-        config['feature_process_size'] = config['feature_process_size_panorama']
-        config['feature_min_frames'] = config['feature_min_frames_panorama']
-
     start = timer()
     p_unmasked, f_unmasked, c_unmasked = features.extract_features(
-        data.load_image(image), config)
+        data.load_image(image), data.config,
+        is_high_res_panorama(data, image))
 
     fmask = data.load_features_mask(image, p_unmasked)
 
