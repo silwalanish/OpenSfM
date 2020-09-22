@@ -26,7 +26,7 @@ public:
   //! max valid distance between landmark and camera
   float min_valid_dist_ = 0;
   //! min valid distance between landmark and camera
-  float max_valid_dist_ = 0; 
+  float max_valid_dist_ = 0;
   size_t GetNumObserved() const { return num_observed_; }
   size_t GetNumObservable() const { return num_observable_; }
 private:
@@ -50,7 +50,7 @@ class Landmark {
 
   // Utility functions
   bool IsObservedInShot(Shot* shot) const { return observations_.count(shot) > 0; }
-  void AddObservation(Shot* shot, const FeatureId feat_id) { observations_.emplace(shot, feat_id); }
+  void AddObservation(Shot* shot, const FeatureId& feat_id) { observations_.emplace(shot, feat_id); }
   void RemoveObservation(Shot* shot);
   bool HasObservations() const { return !observations_.empty(); }
   size_t NumberOfObservations() const { return observations_.size(); }
@@ -77,8 +77,8 @@ class Landmark {
   bool operator>=(const Landmark& lm) const { return id_ >= lm.id_; }
 
   // Reprojection Errors
-  void SetReprojectionErrors(const std::unordered_map<ShotId, Eigen::VectorXd> reproj_errors);
-  std::unordered_map<ShotId, Eigen::VectorXd> GetReprojectionErrors() const { return reproj_errors_; }
+  void SetReprojectionErrors(const std::map<ShotId, Eigen::VectorXd> &reproj_errors);
+  std::map<ShotId, Eigen::VectorXd> GetReprojectionErrors() const { return reproj_errors_; }
   void RemoveReprojectionError(const ShotId& shot_id)
   {
     auto it = reproj_errors_.find(shot_id);
@@ -97,7 +97,7 @@ private:
   std::map<Shot*, FeatureId, KeyCompare> observations_;
   Shot* ref_shot_; //shot in which the landmark was first seen
   Vec3i color_;
-  std::unordered_map<ShotId, Eigen::VectorXd> reproj_errors_;
+  std::map<ShotId, Eigen::VectorXd> reproj_errors_;
 
 };
 }

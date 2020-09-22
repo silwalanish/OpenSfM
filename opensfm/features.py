@@ -246,8 +246,8 @@ def extract_features_orb(image, config, features_count):
     return points, desc
 
 
-def extract_features(color_image, config, is_panorama):
-    """Detect features in an image.
+def extract_features(image, config, is_panorama):
+    """Detect features in a color or gray-scale image.
 
     The type of feature detected is determined by the ``feature_type``
     config option.
@@ -258,6 +258,12 @@ def extract_features(color_image, config, is_panorama):
     Optionnaly, one can indicate if the image is a panorama one. If True,
     alternate settings are used for feature count and extraction size.
 
+    Args:
+        image: a color image with shape (h, w, 3) or
+            gray-scale image with (h, w) or (h, w, 1)
+        config: the configuration structure
+        is_panorama: True if image must be treated as a panorama
+
     Returns:
         tuple:
         - points: ``x``, ``y``, ``size`` and ``angle`` for each feature
@@ -266,29 +272,39 @@ def extract_features(color_image, config, is_panorama):
     """
     extraction_size = config['feature_process_size_panorama'] if is_panorama else config['feature_process_size']
     features_count = config['feature_min_frames_panorama'] if is_panorama else config['feature_min_frames']
+    assert len(image.shape) == 3 or len(image.shape) == 2
 
-    assert len(color_image.shape) == 3
-    color_image = resized_image(color_image, extraction_size)
-    image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
+    if len(image.shape) == 2: # convert (h, w) to (h, w, 1)
+        image = np.expand_dims(image, axis=2)
+
+    image = resized_image(image, config)
+
+    # convert color to gray-scale if necessary
+    if image.shape[2] == 3:
+        image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    else:
+        image_gray = image
 
     feature_type = config['feature_type'].upper()
     if feature_type == 'SIFT':
-        points, desc = extract_features_sift(image, config, features_count)
+        points, desc = extract_features_sift(image_gray, config, features_count)
     elif feature_type == 'SURF':
-        points, desc = extract_features_surf(image, config, features_count)
+        points, desc = extract_features_surf(image_gray, config, features_count)
     elif feature_type == 'AKAZE':
-        points, desc = extract_features_akaze(image, config, features_count)
+        points, desc = extract_features_akaze(image_gray, config, features_count)
     elif feature_type == 'HAHOG':
-        points, desc = extract_features_hahog(image, config, features_count)
+        points, desc = extract_features_hahog(image_gray, config, features_count)
     elif feature_type == 'ORB':
-        points, desc = extract_features_orb(image, config, features_count)
+        points, desc = extract_features_orb(image_gray, config, features_count)
     else:
         raise ValueError('Unknown feature type '
                          '(must be SURF, SIFT, AKAZE, HAHOG or ORB)')
 
     xs = points[:, 0].round().astype(int)
     ys = points[:, 1].round().astype(int)
-    colors = color_image[ys, xs]
+    colors = image[ys, xs]
+    if image.shape[2] == 1:
+        colors = np.repeat(colors, 3).reshape((-1,3))
 
     return normalize_features(points, desc, colors,
                               image.shape[1], image.shape[0])

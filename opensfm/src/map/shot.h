@@ -70,6 +70,8 @@ class Shot {
   // outside of the reconstruction.
   Shot(const ShotId& shot_id, std::unique_ptr<Camera> cam, const geometry::Pose& pose);
 
+  ShotId GetId() const { return id_; }
+
   const DescriptorType GetDescriptor(const FeatureId id) const {
     return descriptors_.row(id);
   }
@@ -160,6 +162,7 @@ class Shot {
 
   void SetPose(const geometry::Pose& pose) { pose_ = pose; }
   const geometry::Pose& GetPose() const { return pose_; }
+  geometry::Pose& GetPose() { return pose_; }
   Mat4d GetWorldToCam() const { return pose_.WorldToCamera(); }
   Mat4d GetCamToWorld() const { return pose_.CameraToWorld(); }
 
@@ -195,10 +198,11 @@ class Shot {
   bool UseLinearDataStructure() const { return !landmarks_.empty(); }
 
  public:
-  SLAMShotData slam_data_;
   const ShotId id_;  // the file name
-  ShotUniqueId unique_id_;
   const Camera* const shot_camera_;
+  SLAMShotData slam_data_;
+  ShotUniqueId unique_id_;
+
   ShotMeasurements shot_measurements_;  // metadata
   ShotMesh mesh;
   MatXd covariance;
