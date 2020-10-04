@@ -8,14 +8,12 @@
 !data/berlin/images
 !data/berlin/reconstruction_example.json
 !data/lund/images
-!doc
 !LICENSE
 !opensfm
 !README.md
 !requirements.txt
 !setup.cfg
 !setup.py
-!viewer
 
 # Picking exceptions
 doc/build
